@@ -1,3 +1,5 @@
+import csv
+
 from pprint import PrettyPrinter
 from urllib.parse import urljoin
 
@@ -69,12 +71,29 @@ def looper(session, visited=set(), links_to_visit=None):
     return visited
 
 
+def save_urls(visited):
+    filepath = "scanned_urls.csv"
+
+    with open(filepath, mode="w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["scanned_links"])
+        for link in visited:
+            writer.writerow([link])
+
+    print(f"Scanned urls saved to: '{filepath}'")
+
+
+def pretty_print(visited):
+    printer = PrettyPrinter(indent=2)
+    printer.pprint({"URLs visited": visited})
+
+
 def main():
     session = start_session()
     visited = looper(session)
     close_session(session)
-    printer = PrettyPrinter(indent=2)
-    printer.pprint({"URLs visited": visited})
+    pretty_print(visited)
+    save_urls(visited)
 
 
 if __name__ == "__main__":
