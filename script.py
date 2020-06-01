@@ -1,6 +1,5 @@
 from pprint import PrettyPrinter
 from urllib.parse import urljoin
-from time import sleep
 
 import requests as r
 from bs4 import BeautifulSoup
@@ -11,20 +10,17 @@ s = r.Session()
 
 
 def cook_soup(url):
-    response = s.get(url, timeout=60)
-    print(f"URL: {url} --> {response.status_code}")
+    response = s.get(url, timeout=(30, 60))
+    print(f"URL: {url} : response status --> {response.status_code}")
     return BeautifulSoup(response.text, "lxml")
 
 
 def get_internal_links(soup):
     output = []
-    elements = soup.select("a[href]")
+    elements = soup.select('a[href^="https://svse-v2-sint.edge-sint.k2ng-dev.net"]')
 
     for element in elements:
-        if (element["href"]) and (
-            element["href"].startswith("https://svse-v2-sint.edge-sint.k2ng-dev.net")
-        ):
-            output.append(element["href"])
+        output.append(element["href"])
 
     return set(output)
 
@@ -39,14 +35,25 @@ def process_page(url):
     return full_links
 
 
+def extend_links_to_visit(new_links, links_to_visit):
+    for link in new_links:
+        if link not in links_to_visit:
+            links_to_visit.add(link)
+
+    return links_to_visit
+
+
 # pylint:disable=dangerous-default-value
 def looper(links, visited=set(), links_to_visit=None):
+    links_to_visit = extend_links_to_visit(links, links_to_visit)
+
     for link_ in links:
         if link_ not in visited:
             visited.add(link_)
             if visited != links_to_visit:
-                sleep(0.5)
-                return looper(process_page(link_), visited=visited)
+                return looper(
+                    process_page(link_), visited=visited, links_to_visit=links_to_visit
+                )
 
     return visited
 
