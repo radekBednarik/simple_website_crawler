@@ -1,5 +1,3 @@
-import sys
-
 from pprint import PrettyPrinter
 from urllib.parse import urljoin
 
