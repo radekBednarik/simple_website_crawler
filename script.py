@@ -1,3 +1,5 @@
+import sys
+
 from pprint import PrettyPrinter
 from urllib.parse import urljoin
 
@@ -6,11 +8,14 @@ from bs4 import BeautifulSoup
 
 HOSTNAME = "https://svse-v2-sint.edge-sint.k2ng-dev.net"
 
+# if there are lots of links
+sys.setrecursionlimit(sys.getrecursionlimit() * 2)
+
 s = r.Session()
 
 
 def cook_soup(url):
-    response = s.get(url, timeout=(30, 60))
+    response = s.get(url, timeout=(60, 120))
     print(f"URL: {url} : response status --> {response.status_code}")
     return BeautifulSoup(response.text, "lxml")
 
@@ -20,7 +25,8 @@ def get_internal_links(soup):
     elements = soup.select('a[href^="https://svse-v2-sint.edge-sint.k2ng-dev.net"]')
 
     for element in elements:
-        output.append(element["href"])
+        if "/_doc/" not in element["href"]:
+            output.append(element["href"])
 
     return set(output)
 
@@ -47,7 +53,7 @@ def extend_links_to_visit(new_links, links_to_visit):
 def looper(links, visited=set(), links_to_visit=None):
     links_to_visit = extend_links_to_visit(links, links_to_visit)
 
-    for link_ in links:
+    for link_ in links_to_visit:
         if link_ not in visited:
             visited.add(link_)
             if visited != links_to_visit:
