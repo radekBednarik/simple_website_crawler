@@ -9,9 +9,9 @@ HOSTNAME = "https://svse-v2-sint.edge-sint.k2ng-dev.net"
 s = r.Session()
 
 
-def cook_soup(url):
+def cook_soup(url, index):
     response = s.get(url, timeout=(60, 120))
-    print(f"URL: {url} : response status --> {response.status_code}")
+    print(f"URL no. {index}: {url} : response status --> {response.status_code}")
     return BeautifulSoup(response.text, "lxml")
 
 
@@ -30,8 +30,8 @@ def create_full_link(hostname, internal_link):
     return urljoin(hostname, internal_link)
 
 
-def process_page(url):
-    links = get_internal_links(cook_soup(url))
+def process_page(url, index):
+    links = get_internal_links(cook_soup(url, index))
     full_links = {create_full_link(HOSTNAME, link) for link in links}
     return full_links
 
@@ -46,15 +46,15 @@ def extend_links_to_visit(new_links, links_to_visit, visited):
 
 # pylint:disable=dangerous-default-value
 def looper(visited=set(), links_to_visit=None):
-    links_to_visit = process_page(HOSTNAME)
+    links_to_visit = process_page(HOSTNAME, 0)
 
     while True:
         if visited != links_to_visit:
-            for link in list(links_to_visit):
+            for index, link in enumerate(list(links_to_visit), 1):
                 if link not in visited:
                     visited.add(link)
                     links_to_visit = extend_links_to_visit(
-                        process_page(link), links_to_visit, visited
+                        process_page(link, index), links_to_visit, visited
                     )
                 else:
                     continue
