@@ -8,9 +8,6 @@ from bs4 import BeautifulSoup
 
 HOSTNAME = "https://svse-v2-sint.edge-sint.k2ng-dev.net"
 
-# if there are lots of links
-sys.setrecursionlimit(sys.getrecursionlimit() * 2)
-
 s = r.Session()
 
 
@@ -41,32 +38,34 @@ def process_page(url):
     return full_links
 
 
-def extend_links_to_visit(new_links, links_to_visit):
+def extend_links_to_visit(new_links, links_to_visit, visited):
     for link in new_links:
-        if link not in links_to_visit:
+        if (link not in links_to_visit) and (link not in visited):
             links_to_visit.add(link)
 
     return links_to_visit
 
 
 # pylint:disable=dangerous-default-value
-def looper(links, visited=set(), links_to_visit=None):
-    links_to_visit = extend_links_to_visit(links, links_to_visit)
+def looper(visited=set(), links_to_visit=None):
+    links_to_visit = process_page(HOSTNAME)
 
-    for link_ in links_to_visit:
-        if link_ not in visited:
-            visited.add(link_)
-            if visited != links_to_visit:
-                return looper(
-                    process_page(link_), visited=visited, links_to_visit=links_to_visit
-                )
-
+    while True:
+        if visited != links_to_visit:
+            for link in list(links_to_visit):
+                if link not in visited:
+                    visited.add(link)
+                    links_to_visit = extend_links_to_visit(
+                        process_page(link), links_to_visit, visited
+                    )
+                else:
+                    continue
+        break
     return visited
 
 
 def main():
-    links_to_visit = process_page(HOSTNAME)
-    visited = looper(links_to_visit, links_to_visit=links_to_visit)
+    visited = looper()
     printer = PrettyPrinter(indent=2)
     printer.pprint({"URLs visited": visited})
 
