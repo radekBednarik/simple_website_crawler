@@ -17,8 +17,8 @@ def close_session(session):
 
 
 def cook_soup(url, session):
-    response = session.get(url, timeout=(60, 120))
-    print(f"URL: {url} : response status --> {response.status_code}")
+    response = session.get(url, timeout=(120, 180))
+    print(f"URL: '{url}':: it took: '{response.elapsed}' :: response status: '{response.status_code}'")
     return BeautifulSoup(response.text, "lxml")
 
 
@@ -87,7 +87,7 @@ def save_urls(visited):
 def pretty_print(visited):
     printer = PrettyPrinter(indent=2)
     printer.pprint({"URLs visited": visited})
-    printer.pprint(f"No. of URLs scanned: {len(visited)}")
+    print(f"No. of URLs scanned: {len(visited)}")
 
 
 def main():
