@@ -1,5 +1,4 @@
 import csv
-
 from pprint import PrettyPrinter
 from urllib.parse import urljoin
 
@@ -44,9 +43,11 @@ def process_page(url, session):
     return full_links
 
 
-def extend_links_to_visit(new_links, links_to_visit, visited):
+def update_links_to_visit(new_links, links_to_visit, visited):
     for link in new_links:
-        if (link not in links_to_visit) and (link not in visited):
+        if link in visited:
+            links_to_visit.discard(link)
+        else:
             links_to_visit.add(link)
 
     return links_to_visit
@@ -57,15 +58,15 @@ def looper(session, visited=set(), links_to_visit=None):
     links_to_visit = process_page(HOSTNAME, session)
 
     while True:
-        if visited != links_to_visit:
+        if len(links_to_visit) > 0:
             for link in list(links_to_visit):
                 if link not in visited:
                     visited.add(link)
-                    links_to_visit = extend_links_to_visit(
+                    links_to_visit = update_links_to_visit(
                         process_page(link, session), links_to_visit, visited
                     )
                 else:
-                    continue
+                    links_to_visit.discard(link)
         else:
             break
     return visited
@@ -86,6 +87,7 @@ def save_urls(visited):
 def pretty_print(visited):
     printer = PrettyPrinter(indent=2)
     printer.pprint({"URLs visited": visited})
+    printer.pprint(f"No. of URLs scanned: {len(visited)}")
 
 
 def main():
