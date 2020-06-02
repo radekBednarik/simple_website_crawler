@@ -1,11 +1,18 @@
 import csv
+import sys
 from pprint import PrettyPrinter
 from urllib.parse import urljoin
 
 import requests as r
 from bs4 import BeautifulSoup
 
-HOSTNAME = "https://matejimposv2-master.edge.k2ng-dev.net/"
+
+def get_hostname():
+    try:
+        return sys.argv[1]
+    except IndexError as e:
+        print(f"You have to provide hostname URL, e.g. https://matejimposv2-master.edge.k2ng-dev.net/.\nError: {str(e)}")
+        sys.exit(1)
 
 
 def start_session():
@@ -24,7 +31,7 @@ def cook_soup(url, session):
 
 def get_internal_links(soup):
     output = []
-    elements = soup.select(f'a[href^="{HOSTNAME}"]')
+    elements = soup.select(f'a[href^="{get_hostname()}"]')
 
     for element in elements:
         if "/_doc/" not in element["href"]:
@@ -39,7 +46,7 @@ def create_full_link(hostname, internal_link):
 
 def process_page(url, session):
     links = get_internal_links(cook_soup(url, session))
-    full_links = {create_full_link(HOSTNAME, link) for link in links}
+    full_links = {create_full_link(get_hostname(), link) for link in links}
     return full_links
 
 
@@ -55,7 +62,7 @@ def update_links_to_visit(new_links, links_to_visit, visited):
 
 # pylint:disable=dangerous-default-value
 def looper(session, visited=set(), links_to_visit=None):
-    links_to_visit = process_page(HOSTNAME, session)
+    links_to_visit = process_page(get_hostname(), session)
 
     while True:
         if len(links_to_visit) > 0:
