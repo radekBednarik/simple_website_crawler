@@ -2,6 +2,7 @@ import csv
 import sys
 from pprint import PrettyPrinter
 from urllib.parse import urljoin
+from time import sleep
 
 import requests as r
 from bs4 import BeautifulSoup
@@ -11,7 +12,9 @@ def get_hostname():
     try:
         return sys.argv[1]
     except IndexError as e:
-        print(f"You have to provide hostname URL, e.g. https://matejimposv2-master.edge.k2ng-dev.net/.\nError: {str(e)}")
+        print(
+            f"You have to provide hostname URL, e.g. https://matejimposv2-master.edge.k2ng-dev.net/.\nError: {str(e)}"
+        )
         sys.exit(1)
 
 
@@ -25,13 +28,15 @@ def close_session(session):
 
 def cook_soup(url, session):
     response = session.get(url, timeout=(120, 180))
-    print(f"URL: '{url}':: it took: '{response.elapsed}' :: response status: '{response.status_code}'")
+    print(
+        f"URL: '{url}':: it took: '{response.elapsed}' :: response status: '{response.status_code}'"
+    )
     return BeautifulSoup(response.text, "lxml")
 
 
 def get_internal_links(soup):
     output = []
-    elements = soup.select(f'a[href^="{get_hostname()}"]')
+    elements = soup.select(f'a[href^="{get_hostname()}"], a[href^="/"]')
 
     for element in elements:
         if "/_doc/" not in element["href"]:
@@ -78,6 +83,7 @@ def looper(session, visited=set(), links_to_visit=None):
                     )
                 else:
                     links_to_visit.discard(link)
+                sleep(0.1)
         else:
             break
     return visited
