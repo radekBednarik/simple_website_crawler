@@ -5,7 +5,7 @@ from urllib.parse import urljoin
 import requests as r
 from bs4 import BeautifulSoup
 
-HOSTNAME = "https://svse-v2-sint.edge-sint.k2ng-dev.net"
+HOSTNAME = "https://matejimposv2-master.edge.k2ng-dev.net/"
 
 
 def start_session():
@@ -24,7 +24,7 @@ def cook_soup(url, session):
 
 def get_internal_links(soup):
     output = []
-    elements = soup.select('a[href^="https://svse-v2-sint.edge-sint.k2ng-dev.net"]')
+    elements = soup.select(f'a[href^="{HOSTNAME}"]')
 
     for element in elements:
         if "/_doc/" not in element["href"]:
