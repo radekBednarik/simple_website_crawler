@@ -67,6 +67,10 @@ def looper(session, visited=set(), links_to_visit=None):
     while True:
         if len(links_to_visit) > 0:
             for link in list(links_to_visit):
+                # quick hack to avoid files - can lose some links due to this, maybe
+                if link[-4] == ".":
+                    links_to_visit.discard(link)
+                    continue
                 if link not in visited:
                     visited.add(link)
                     links_to_visit = update_links_to_visit(
