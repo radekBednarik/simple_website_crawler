@@ -72,18 +72,27 @@ def looper(session, visited=set(), links_to_visit=None):
     while True:
         if len(links_to_visit) > 0:
             for link in list(links_to_visit):
-                # quick hack to avoid files - can lose some links due to this, maybe
-                if link[-4] == ".":
-                    links_to_visit.discard(link)
-                    continue
-                if link not in visited:
-                    visited.add(link)
-                    links_to_visit = update_links_to_visit(
-                        process_page(link, session), links_to_visit, visited
+                try:
+                    # quick hack to avoid actually sending requests to files - can lose some links due to this, maybe
+                    if link[-4] == ".":
+                        links_to_visit.discard(link)
+                        visited.add(link)
+                        continue
+                    if link not in visited:
+                        visited.add(link)
+                        links_to_visit = update_links_to_visit(
+                            process_page(link, session), links_to_visit, visited
+                        )
+                    else:
+                        links_to_visit.discard(link)
+                    sleep(0.1)
+                except Exception as e:
+                    print(
+                        f"Exception encountered. Link '{link}' discarded. Possible links on this page are therefore lost. \
+                        \nException: {str(e)}"
                     )
-                else:
                     links_to_visit.discard(link)
-                sleep(0.1)
+                    visited.add(link)
         else:
             break
     return visited
