@@ -1,5 +1,6 @@
 import csv
 import sys
+from datetime import datetime as dt
 from pprint import PrettyPrinter
 from urllib.parse import urljoin
 from time import sleep
@@ -199,7 +200,9 @@ def save_urls(visited: Set[str]) -> None:
     Arguments:
         visited {Set[str]} -- set of all found URLs on the site
     """
-    filepath = "scanned_urls.csv"
+    filename = "scanned_links.csv"
+    timestamp = dt.now().strftime("%Y%m%d_%H%M%S")
+    filepath = "_".join([timestamp, filename])
 
     with open(filepath, mode="w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
