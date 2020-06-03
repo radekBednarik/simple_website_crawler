@@ -13,7 +13,7 @@ def get_hostname():
         return sys.argv[1]
     except IndexError as e:
         print(
-            f"You have to provide hostname URL, e.g. https://matejimposv2-master.edge.k2ng-dev.net/.\nError: {str(e)}"
+            f"You have to provide hostname URL, e.g. https://www.ihned.cz.\nError: {str(e)}"
         )
         sys.exit(1)
 
