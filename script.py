@@ -1,4 +1,5 @@
 import csv
+import signal
 import sys
 from datetime import datetime as dt
 from datetime import timedelta
@@ -16,27 +17,102 @@ from bs4 import BeautifulSoup
 from colorama import Fore, init
 
 
+# pylint:disable=unused-argument
+def signal_handler(signum: int, stack_frame: Any) -> None:
+    """Cleanly exits the running script without ugly stacktrace in the console.
+
+    Arguments:
+        signum {int} -- signal.SIGINT number
+        stack_frame {Any} -- stack frame
+    
+    See:
+        https://docs.python.org/3/library/signal.html#signal.signal
+    """
+    print("\rYou terminated the script execution.")
+    sys.exit(0)
+
+
+def start_sigint_catching() -> None:
+    """Sets the handling function for SIGINT.
+
+    See:
+        https://docs.python.org/3/library/signal.html#signal.signal
+    """
+    signal.signal(signal.SIGINT, signal_handler)
+
+
 def start_coloring() -> None:
+    """Initializes coloring of the console output via Colorama.
+
+    See:
+        https://github.com/tartley/colorama
+    """
     init()
 
 
 def color_green(string: str) -> str:
+    """Returns string to be printed out by given colour.
+
+    Arguments:
+        string {str} -- string to be colourized
+
+    Returns:
+        str -- colourized string
+    """
     return f"{Fore.GREEN}{string}{Fore.RESET}"
 
 
 def color_red(string: str) -> str:
+    """Returns string to be printed out by given colour.
+
+    Arguments:
+        string {str} -- string to be colourized
+
+    Returns:
+        str -- colourized string
+    """
     return f"{Fore.RED}{string}{Fore.RESET}"
 
 
 def color_yellow(string: str) -> str:
+    """Returns string to be printed out by given colour.
+
+    Arguments:
+        string {str} -- string to be colourized
+
+    Returns:
+        str -- colourized string
+    """
     return f"{Fore.YELLOW}{string}{Fore.RESET}"
 
 
 def color_blue(string: str) -> str:
+    """Returns string to be printed out by given colour.
+
+    Arguments:
+        string {str} -- string to be colourized
+
+    Returns:
+        str -- colourized string
+    """
     return f"{Fore.BLUE}{string}{Fore.RESET}"
 
 
 def color_response_status(string: str) -> str:
+    """Returns colorized requests response status code to be printed in the console.
+
+        Green: 200 - 299
+
+        Red: 300 - 399
+
+        Yellow: other
+
+    Arguments:
+        string {str} -- string to be colourized
+
+    Returns:
+        str -- colourized string
+    """
     if string.startswith("2"):
         return color_green(string)
     if string.startswith("4"):
@@ -45,6 +121,20 @@ def color_response_status(string: str) -> str:
 
 
 def color_response_time(time_: timedelta) -> str:
+    """Returns colorized request response timedelta value to be printed in the console.
+
+        timedelta.seconds <= 1: green
+
+        timedelta.seconds > 1 and <= 5: yellow
+
+        other: red
+
+    Arguments:
+        time_ {timedelta} -- timedelta value returned by requests.response()
+
+    Returns:
+        str -- colourized string
+    """
     if time_.seconds <= 1:
         return color_green(str(time_))
     if (time_.seconds > 1) and (time_.seconds <= 5):
@@ -96,6 +186,7 @@ def cook_soup(url: str, session: r.Session) -> Any:
         BeautifulSoup -- parsed content of the page as BeautifulSoup() object
     """
     response = session.get(url, timeout=(120, 180))
+    # yea, I know the line is a bit too long, but the template is not easily formattable with breaks and I cannot be bothered that much :)
     print(
         f"URL: '{color_blue(url)}' :: it took: '{color_response_time(response.elapsed)}' :: response status: '{color_response_status(str(response.status_code))}'"
     )
@@ -267,6 +358,7 @@ def pretty_print(visited: Set[str]) -> None:
 def main() -> None:
     """Main func.
     """
+    start_sigint_catching()
     start_coloring()
     session = start_session()
     visited = looper(session)
