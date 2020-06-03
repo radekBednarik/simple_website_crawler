@@ -1,15 +1,55 @@
 import csv
 import sys
 from datetime import datetime as dt
+from datetime import timedelta
 from pprint import PrettyPrinter
-from urllib.parse import urljoin
 from time import sleep
 from typing import Any, Set, Union
+from urllib.parse import urljoin
 
 import requests as r
 
 # pyre-ignore
 from bs4 import BeautifulSoup
+
+# pyre-ignore
+from colorama import Fore, init
+
+
+def start_coloring() -> None:
+    init()
+
+
+def color_green(string: str) -> str:
+    return f"{Fore.GREEN}{string}{Fore.RESET}"
+
+
+def color_red(string: str) -> str:
+    return f"{Fore.RED}{string}{Fore.RESET}"
+
+
+def color_yellow(string: str) -> str:
+    return f"{Fore.YELLOW}{string}{Fore.RESET}"
+
+
+def color_blue(string: str) -> str:
+    return f"{Fore.BLUE}{string}{Fore.RESET}"
+
+
+def color_response_status(string: str) -> str:
+    if string.startswith("2"):
+        return color_green(string)
+    if string.startswith("4"):
+        return color_red(string)
+    return color_yellow(string)
+
+
+def color_response_time(time_: timedelta) -> str:
+    if time_.seconds <= 1:
+        return color_green(str(time_))
+    if (time_.seconds > 1) and (time_.seconds <= 5):
+        return color_yellow(str(time_))
+    return color_red(str(time_))
 
 
 def get_hostname() -> str:
@@ -57,7 +97,7 @@ def cook_soup(url: str, session: r.Session) -> Any:
     """
     response = session.get(url, timeout=(120, 180))
     print(
-        f"URL: '{url}':: it took: '{response.elapsed}' :: response status: '{response.status_code}'"
+        f"URL: '{color_blue(url)}' :: it took: '{color_response_time(response.elapsed)}' :: response status: '{color_response_status(str(response.status_code))}'"
     )
     return BeautifulSoup(response.text, "lxml")
 
@@ -227,6 +267,7 @@ def pretty_print(visited: Set[str]) -> None:
 def main() -> None:
     """Main func.
     """
+    start_coloring()
     session = start_session()
     visited = looper(session)
     close_session(session)
