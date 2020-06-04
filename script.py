@@ -292,7 +292,7 @@ def looper(
         links_to_visit {Union[None, Set[str]]} -- set of URLs to visit. Loop will continue, until this set is empty (default: {None})
 
     Returns:
-        Set[str] -- set of visited URLs
+        Set[str] -- set of visited URLs 
     """
     links_to_visit = process_page(get_hostname(), session)
 
