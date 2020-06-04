@@ -301,7 +301,7 @@ def looper(
             for link in list(links_to_visit):
                 try:
                     # quick hack to avoid actually sending requests to files - can lose some links due to this, maybe
-                    if link[-4] == ".":
+                    if "." in [link[-4], link[-5]]:
                         links_to_visit.discard(link)
                         visited.add(link)
                         continue
