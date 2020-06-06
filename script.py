@@ -351,7 +351,7 @@ def pretty_print(visited: Set[str]) -> None:
         visited {Set[str]} -- set of all found URLs on the site
     """
     printer = PrettyPrinter(indent=2)
-    printer.pprint({"URLs visited": visited})
+    printer.pprint({"URLs scanned": visited})
     print(f"No. of URLs scanned: {len(visited)}")
 
 
