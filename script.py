@@ -186,9 +186,12 @@ def cook_soup(url: str, session: r.Session) -> Any:
         BeautifulSoup -- parsed content of the page as BeautifulSoup() object
     """
     response = session.get(url, timeout=(120, 180))
-    # yea, I know the line is a bit too long, but the template is not easily formattable with breaks and I cannot be bothered that much :)
     print(
-        f"URL: '{color_blue(url)}' :: it took: '{color_response_time(response.elapsed)}' :: response status: '{color_response_status(str(response.status_code))}'"
+        "URL: '{}' :: it took: '{}' :: response status: '{}'".format(
+            color_blue(url),
+            color_response_time(response.elapsed),
+            color_response_status(str(response.status_code)),
+        )
     )
     return BeautifulSoup(response.text, "lxml")
 
@@ -210,8 +213,7 @@ def get_internal_links(soup: Any) -> Set[str]:
     elements = soup.select(f'a[href^="{get_hostname()}"], a[href^="/"]')
 
     for element in elements:
-        if "/_doc/" not in element["href"]:
-            output.append(element["href"])
+        output.append(element["href"])
 
     return set(output)
 
