@@ -137,7 +137,7 @@ def color_response_time(time_: timedelta) -> str:
     """
     if time_.seconds <= 1:
         return color_green(str(time_))
-    if (time_.seconds > 1) and (time_.seconds <= 5):
+    if (time_.seconds > 1) or (time_.seconds <= 5):
         return color_yellow(str(time_))
     return color_red(str(time_))
 
@@ -185,7 +185,7 @@ def cook_soup(url: str, session: r.Session) -> Any:
     Returns:
         BeautifulSoup -- parsed content of the page as BeautifulSoup() object
     """
-    response = session.get(url, timeout=(120, 180))
+    response = session.get(url, timeout=(30, 60))
     print(
         "URL: '{}' :: it took: '{}' :: response status: '{}'".format(
             color_blue(url),
