@@ -176,14 +176,16 @@ def close_session(session: r.Session) -> None:
 
 
 def cook_soup(url: str, session: r.Session) -> Tuple[Any, Tuple[str, timedelta, int]]:
-    """Returns parsed HTML content of web page on provided <url> as <BeautifulSoup> object.
+    """Returns parsed HTML content of web page on provided <url> as <BeautifulSoup> object
+    and response statistics of <url> visited.
 
     Arguments:
         url {str} -- url to page to parse
         session {r.Session} -- requests.Session() object
 
     Returns:
-        BeautifulSoup -- parsed content of the page as BeautifulSoup() object
+        Tuple[Any, Tuple[str, timedelta, int]] -- parsed content of the page as BeautifulSoup() object
+        and response statistics of <url> visited
     """
     response = session.get(url, timeout=(30, 60))
     soup = BeautifulSoup(response.text, "lxml")
@@ -200,17 +202,20 @@ def cook_soup(url: str, session: r.Session) -> Tuple[Any, Tuple[str, timedelta, 
 def get_internal_links(
     soup: Tuple[Any, Tuple[str, timedelta, int]]
 ) -> Tuple[Set[str], Tuple[str, timedelta, int]]:
-    """Returns all internal links, which can be found in provided parsed page content.
+    """Returns all internal links, which can be found in provided parsed page content, 
+    and response statistics of url visited.
 
     Links are selected via this css filters:
 
         'a[href^="{get_hostname()}"], a[href^="/"]'
 
     Arguments:
-        soup {BeautifulSoup} -- parsed page content.
+        soup {Tuple[Any, Tuple[str, timedelta, int]]} -- parsed page content 
+        and passed visited url statistics
 
     Returns:
-        Set[str] -- set of internal hrefs (links)
+        Tuple[Set[str], Tuple[str, timedelta, int]] -- set of internal hrefs (links)
+        and statistics of url visited
     """
     output = []
     elements = soup[0].select(f'a[href^="{get_hostname()}"], a[href^="/"]')
@@ -249,7 +254,8 @@ def process_page(
         session {r.Session} -- requests.Session() object
 
     Returns:
-        Set[str] -- set of full URL links found on parsed page retrieved via provided <url>
+        Tuple[Set[str], Tuple[str, timedelta, int]] -- set of full URL links found on parsed page retrieved via provided <url>
+        and response statistics for visited <url>
     """
     links = get_internal_links(cook_soup(url, session))
     full_links = {create_full_link(get_hostname(), link) for link in links[0]}
@@ -262,17 +268,21 @@ def update_links_to_visit(
     visited: Set[str],
     stats: Set[Tuple[str, timedelta, int]],
 ) -> Tuple[Set[str], Tuple[str, timedelta, int]]:
-    """Updates set of URL links, which are to be scanned.
+    """Updates set of links, which needs to be scanned. 
 
-    Each link of new_links set is validated, whether to be added to links_to_visit set or be discarded from it.
+    Args:
+        new_links (Tuple[Set[str], Tuple[str, timedelta, int]]): links parsed from visited page, url response stats of page
+        which provided new links
 
-    Arguments:
-        new_links {Set[str]} -- set of new URLs retrieved from page
-        links_to_visit {Set[str]} -- set of URLs to be visited
-        visited {Set[str]} -- set of URLs which were visited
+        links_to_visit (Tuple[Set[str], Tuple[str, timedelta, int]]): set of all links, which needs to be scanned;
+        url response stats of last page, which provided new links
+
+        visited (Set[str]): set of scanned links
+
+        stats (Set[Tuple[str, timedelta, int]]): set of visited links and their response stats
 
     Returns:
-        Set[str] -- updated set of URLs to be visited
+        Tuple[Set[str], Tuple[str, timedelta, int]]: set of all links, which needs to be scanned;
     """
     for link in new_links[0]:
         if link in visited:
@@ -301,10 +311,17 @@ def looper(
 
     Keyword Arguments:
         visited {Union[Set[Any], Set[str]]} -- set of visited URLs, starts as empty set (default: {set()})
-        links_to_visit {Union[None, Set[str]]} -- set of URLs to visit. Loop will continue, until this set is empty (default: {None})
+
+        links_to_visit {Union[None, Tuple[Set[str], Tuple[str, timedelta, int]]]} -- set of URLs to visit
+        and tuple with response stats of last url visited.
+        Loop will continue, until this set is empty (default: {None})
 
     Returns:
-        Set[str] -- set of visited URLs
+        Set[Tuple[str, timedelta, int]] -- stats of visited URLs
+
+    Comments:
+        Refactoring candidate -- <visited> is probably redundand - get rid of visited to reduce complexity?
+        only reason it is here is to avoid more expensive scanning of set of tuples, if I used <stats> as check
     """
     links_to_visit = process_page(get_hostname(), session)
     stats = set()
@@ -341,10 +358,10 @@ def looper(
 
 
 def save_urls(visited: Set[Tuple[str, timedelta, int]]) -> None:
-    """Saves found URLs into .csv file.
+    """Saves found URLs stats into .csv file.
 
     Arguments:
-        visited {Set[str]} -- set of all found URLs on the site
+        visited {Set[Tuple[str, timedelta, int]]} -- set of all found URLs response stats on the site
     """
     filename = "scanned_links.csv"
     timestamp = dt.now().strftime("%Y%m%d_%H%M%S")
@@ -363,7 +380,7 @@ def pretty_print(visited: Set[Tuple[str, timedelta, int]]) -> None:
     """PrettyPrints all found URLs on the site and total count of them.
 
     Arguments:
-        visited {Set[str]} -- set of all found URLs on the site
+        visited {Set[Tuple[str, timedelta, int]]} -- set of all found URLs on the site
     """
     printer = PrettyPrinter(indent=2)
     printer.pprint({"URLs scanned": [items[0] for items in visited]})
