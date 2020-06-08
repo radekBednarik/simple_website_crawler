@@ -5,7 +5,7 @@ from datetime import datetime as dt
 from datetime import timedelta
 from pprint import PrettyPrinter
 from time import sleep
-from typing import Any, Set, Union
+from typing import Any, Set, Union, Tuple
 from urllib.parse import urljoin
 
 import requests as r
@@ -186,6 +186,7 @@ def cook_soup(url: str, session: r.Session) -> Any:
         BeautifulSoup -- parsed content of the page as BeautifulSoup() object
     """
     response = session.get(url, timeout=(30, 60))
+    soup = BeautifulSoup(response.text, "lxml")
     print(
         "URL: '{}' :: it took: '{}' :: response status: '{}'".format(
             color_blue(url),
@@ -193,7 +194,7 @@ def cook_soup(url: str, session: r.Session) -> Any:
             color_response_status(str(response.status_code)),
         )
     )
-    return BeautifulSoup(response.text, "lxml")
+    return (soup, (url, response.elapsed, response.status_code))
 
 
 def get_internal_links(soup: Any) -> Set[str]:
@@ -210,12 +211,12 @@ def get_internal_links(soup: Any) -> Set[str]:
         Set[str] -- set of internal hrefs (links)
     """
     output = []
-    elements = soup.select(f'a[href^="{get_hostname()}"], a[href^="/"]')
+    elements = soup[0].select(f'a[href^="{get_hostname()}"], a[href^="/"]')
 
     for element in elements:
         output.append(element["href"])
 
-    return set(output)
+    return (set(output), soup[1])
 
 
 def create_full_link(hostname: str, internal_link: str) -> str:
@@ -247,12 +248,15 @@ def process_page(url: str, session: r.Session) -> Set[str]:
         Set[str] -- set of full URL links found on parsed page retrieved via provided <url>
     """
     links = get_internal_links(cook_soup(url, session))
-    full_links = {create_full_link(get_hostname(), link) for link in links}
-    return full_links
+    full_links = {create_full_link(get_hostname(), link) for link in links[0]}
+    return (full_links, links[1])
 
 
 def update_links_to_visit(
-    new_links: Set[str], links_to_visit: Set[str], visited: Set[str]
+    new_links: Tuple[Set[str], Tuple[str, timedelta, int]],
+    links_to_visit: Set[str],
+    visited: Set[str],
+    stats: Set[Tuple[str, timedelta, int]],
 ) -> Set[str]:
     """Updates set of URL links, which are to be scanned.
 
@@ -266,11 +270,13 @@ def update_links_to_visit(
     Returns:
         Set[str] -- updated set of URLs to be visited
     """
-    for link in new_links:
+    for link in new_links[0]:
         if link in visited:
-            links_to_visit.discard(link)
+            links_to_visit[0].discard(link)
         else:
-            links_to_visit.add(link)
+            links_to_visit[0].add(link)
+
+    stats.add(new_links[1])
 
     return links_to_visit
 
@@ -297,37 +303,38 @@ def looper(
         Set[str] -- set of visited URLs
     """
     links_to_visit = process_page(get_hostname(), session)
+    stats = set()
 
     while True:
-        if len(links_to_visit) > 0:
-            for link in list(links_to_visit):
+        if len(links_to_visit[0]) > 0:
+            for link in list(links_to_visit[0]):
                 try:
                     # quick hack to avoid actually sending requests to files - can lose some links due to this, maybe
                     if "." in [link[-4], link[-5]]:
-                        links_to_visit.discard(link)
+                        links_to_visit[0].discard(link)
                         visited.add(link)
                         continue
                     if link not in visited:
                         visited.add(link)
                         links_to_visit = update_links_to_visit(
-                            process_page(link, session), links_to_visit, visited
+                            process_page(link, session), links_to_visit, visited, stats
                         )
                     else:
-                        links_to_visit.discard(link)
+                        links_to_visit[0].discard(link)
                     sleep(0.1)
                 except Exception as e:
                     print(
                         f"Exception encountered. Link '{link}' discarded. Possible links on this page are therefore lost. \
                         \nException: {str(e)}"
                     )
-                    links_to_visit.discard(link)
+                    links_to_visit[0].discard(link)
                     visited.add(link)
         else:
             break
-    return visited
+    return stats
 
 
-def save_urls(visited: Set[str]) -> None:
+def save_urls(visited: Set[Tuple[str, timedelta, int]]) -> None:
     """Saves found URLs into .csv file.
 
     Arguments:
@@ -339,9 +346,9 @@ def save_urls(visited: Set[str]) -> None:
 
     with open(filepath, mode="w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["scanned_links"])
+        writer.writerow(["scanned_links", "response_time", "response_status_code"])
         for link in visited:
-            writer.writerow([link])
+            writer.writerow(link)
 
     print(f"Scanned urls saved to: '{filepath}'")
 
