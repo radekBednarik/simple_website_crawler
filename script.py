@@ -259,7 +259,11 @@ def process_page(
     """
     links = get_internal_links(cook_soup(url, session))
     full_links = {create_full_link(get_hostname(), link) for link in links[0]}
-    return (full_links, links[1])
+    # enforcing same hostname here.
+    # so in case of huge site with subsites like in case of newsite webs,
+    # this will omit huge if not all of the possibly valids links
+    full_links_ = {link for link in full_links if link.startswith(get_hostname())}
+    return (full_links_, links[1])
 
 
 def update_links_to_visit(
