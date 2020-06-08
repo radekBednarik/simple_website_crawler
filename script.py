@@ -135,9 +135,9 @@ def color_response_time(time_: timedelta) -> str:
     Returns:
         str -- colourized string
     """
-    if time_.seconds <= 1:
+    if time_.total_seconds() <= 1:
         return color_green(str(time_))
-    if (time_.seconds > 1) or (time_.seconds <= 5):
+    if (time_.total_seconds() > 1) or (time_.total_seconds() <= 3):
         return color_yellow(str(time_))
     return color_red(str(time_))
 
