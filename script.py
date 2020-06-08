@@ -175,7 +175,7 @@ def close_session(session: r.Session) -> None:
     session.close()
 
 
-def cook_soup(url: str, session: r.Session) -> Any:
+def cook_soup(url: str, session: r.Session) -> Tuple[Any, Tuple[str, timedelta, int]]:
     """Returns parsed HTML content of web page on provided <url> as <BeautifulSoup> object.
 
     Arguments:
@@ -197,7 +197,9 @@ def cook_soup(url: str, session: r.Session) -> Any:
     return (soup, (url, response.elapsed, response.status_code))
 
 
-def get_internal_links(soup: Any) -> Set[str]:
+def get_internal_links(
+    soup: Tuple[Any, Tuple[str, timedelta, int]]
+) -> Tuple[Set[str], Tuple[str, timedelta, int]]:
     """Returns all internal links, which can be found in provided parsed page content.
 
     Links are selected via this css filters:
@@ -234,7 +236,9 @@ def create_full_link(hostname: str, internal_link: str) -> str:
     return urljoin(hostname, internal_link)
 
 
-def process_page(url: str, session: r.Session) -> Set[str]:
+def process_page(
+    url: str, session: r.Session
+) -> Tuple[Set[str], Tuple[str, timedelta, int]]:
     """Wraps several functions under one hood.
 
     Visits URL, gets HTML, parses it, gets internal links, converts them to full links
@@ -254,10 +258,10 @@ def process_page(url: str, session: r.Session) -> Set[str]:
 
 def update_links_to_visit(
     new_links: Tuple[Set[str], Tuple[str, timedelta, int]],
-    links_to_visit: Set[str],
+    links_to_visit: Tuple[Set[str], Tuple[str, timedelta, int]],
     visited: Set[str],
     stats: Set[Tuple[str, timedelta, int]],
-) -> Set[str]:
+) -> Tuple[Set[str], Tuple[str, timedelta, int]]:
     """Updates set of URL links, which are to be scanned.
 
     Each link of new_links set is validated, whether to be added to links_to_visit set or be discarded from it.
@@ -285,8 +289,8 @@ def update_links_to_visit(
 def looper(
     session: r.Session,
     visited: Union[Set[Any], Set[str]] = set(),
-    links_to_visit: Union[None, Set[str]] = None,
-) -> Set[str]:
+    links_to_visit: Union[None, Tuple[Set[str], Tuple[str, timedelta, int]]] = None,
+) -> Set[Tuple[str, timedelta, int]]:
     """Scans for all internal URLs, starting with provided hostname of the site.
 
     Scan leverages infinite loop to avoid exceeding recursion limit in case of very large number
@@ -313,6 +317,7 @@ def looper(
                     if "." in [link[-4], link[-5]]:
                         links_to_visit[0].discard(link)
                         visited.add(link)
+                        stats.add((link, timedelta(milliseconds=0.0), 0))
                         continue
                     if link not in visited:
                         visited.add(link)
@@ -329,6 +334,7 @@ def looper(
                     )
                     links_to_visit[0].discard(link)
                     visited.add(link)
+                    stats.add((link, timedelta(milliseconds=0.0), 0))
         else:
             break
     return stats
@@ -353,14 +359,14 @@ def save_urls(visited: Set[Tuple[str, timedelta, int]]) -> None:
     print(f"Scanned urls saved to: '{filepath}'")
 
 
-def pretty_print(visited: Set[str]) -> None:
+def pretty_print(visited: Set[Tuple[str, timedelta, int]]) -> None:
     """PrettyPrints all found URLs on the site and total count of them.
 
     Arguments:
         visited {Set[str]} -- set of all found URLs on the site
     """
     printer = PrettyPrinter(indent=2)
-    printer.pprint({"URLs scanned": visited})
+    printer.pprint({"URLs scanned": [items[0] for items in visited]})
     print(f"No. of URLs scanned: {len(visited)}")
 
 
