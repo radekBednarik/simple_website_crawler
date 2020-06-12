@@ -5,8 +5,8 @@ from datetime import datetime as dt
 from datetime import timedelta
 from pprint import PrettyPrinter
 from time import sleep
-from typing import Any, Set, Union, Tuple
-from urllib.parse import urljoin
+from typing import Any, Set, Tuple, Union
+from urllib.parse import urljoin, urlsplit
 
 import requests as r
 
@@ -218,7 +218,8 @@ def get_internal_links(
         and statistics of url visited
     """
     output = []
-    elements = soup[0].select(f'a[href^="{get_hostname()}"], a[href^="/"]')
+    base = get_hostname()
+    elements = soup[0].select(f'a[href^="{base}"], a[href^="/"]')
 
     for element in elements:
         output.append(element["href"])
@@ -238,7 +239,22 @@ def create_full_link(hostname: str, internal_link: str) -> str:
     Returns:
         str -- full URL link
     """
-    return urljoin(hostname, internal_link)
+    hostname_split = urlsplit(hostname)
+    internal_link_split = urlsplit(internal_link)
+
+    # if found internal link has netloc part
+    # check, if this part of url contains some part
+    # of hostname netloc. If so, than consider it
+    # internal link and urljoin() full hostname and internal link
+    # that will use netloc part from internal link
+    # that is useful in case of big websites with subdomains
+    if internal_link_split.netloc != "":
+        parts = hostname_split.netloc.split(sep=".")
+        for part in parts:
+            if part in internal_link_split.netloc:
+                return urljoin(hostname, internal_link)
+
+    return urljoin(hostname, internal_link_split.path)
 
 
 def process_page(
@@ -258,11 +274,7 @@ def process_page(
         and response statistics for visited <url>
     """
     links = get_internal_links(cook_soup(url, session))
-    full_links = {create_full_link(get_hostname(), link) for link in links[0]}
-    # enforcing same hostname here.
-    # so in case of huge site with subsites like in case of newsite webs,
-    # this will omit huge if not all of the possibly valids links
-    full_links_ = {link for link in full_links if link.startswith(get_hostname())}
+    full_links_ = {create_full_link(get_hostname(), link) for link in links[0]}
     return (full_links_, links[1])
 
 
