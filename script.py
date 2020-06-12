@@ -5,7 +5,7 @@ from datetime import datetime as dt
 from datetime import timedelta
 from pprint import PrettyPrinter
 from time import sleep
-from typing import Any, Set, Tuple, Union
+from typing import Any, Set, Tuple, Union, Optional
 from urllib.parse import urljoin, urlsplit
 
 import requests as r
@@ -137,7 +137,7 @@ def color_response_time(time_: timedelta) -> str:
     """
     if time_.total_seconds() <= 1:
         return color_green(str(time_))
-    if (time_.total_seconds() > 1) or (time_.total_seconds() <= 3):
+    if (time_.total_seconds() > 1) and (time_.total_seconds() <= 3):
         return color_yellow(str(time_))
     return color_red(str(time_))
 
@@ -227,7 +227,7 @@ def get_internal_links(
     return (set(output), soup[1])
 
 
-def create_full_link(hostname: str, internal_link: str) -> str:
+def create_full_link(hostname: str, internal_link: str) -> Optional[str]:
     """Returns full link from <hostname> and <internal_link> parts.
 
     Uses urllib.parse.urljoin() method.
@@ -250,9 +250,11 @@ def create_full_link(hostname: str, internal_link: str) -> str:
     # that is useful in case of big websites with subdomains
     if internal_link_split.netloc != "":
         parts = hostname_split.netloc.split(sep=".")
-        for part in parts:
+        for part in parts[1:-1]:
             if part in internal_link_split.netloc:
                 return urljoin(hostname, internal_link)
+        else:
+            return None
 
     return urljoin(hostname, internal_link_split.path)
 
@@ -274,7 +276,8 @@ def process_page(
         and response statistics for visited <url>
     """
     links = get_internal_links(cook_soup(url, session))
-    full_links_ = {create_full_link(get_hostname(), link) for link in links[0]}
+    full_links = {create_full_link(get_hostname(), link) for link in links[0]}
+    full_links_ = {link for link in full_links if link is not None}
     return (full_links_, links[1])
 
 
