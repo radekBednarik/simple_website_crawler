@@ -3,9 +3,10 @@ import signal
 import sys
 from datetime import datetime as dt
 from datetime import timedelta
+from multiprocessing import get_context
 from pprint import PrettyPrinter
 from time import sleep
-from typing import Any, Set, Tuple, Union, Optional
+from typing import Any, Set, Tuple, Union, Optional, Callable
 from urllib.parse import urljoin, urlsplit
 
 import requests as r
@@ -196,6 +197,7 @@ def cook_soup(url: str, session: r.Session) -> Tuple[Any, Tuple[str, timedelta, 
             color_response_status(str(response.status_code)),
         )
     )
+    sleep(0.1)
     return (soup, (url, response.elapsed, response.status_code))
 
 
@@ -286,7 +288,11 @@ def update_links_to_visit(
     links_to_visit: Tuple[Set[str], Tuple[str, timedelta, int]],
     visited: Set[str],
     stats: Set[Tuple[str, timedelta, int]],
-) -> Tuple[Set[str], Tuple[str, timedelta, int]]:
+) -> Tuple[
+    Tuple[Set[str], Tuple[str, timedelta, int]],
+    Set[str],
+    Set[Tuple[str, timedelta, int]],
+]:
     """Updates set of links, which needs to be scanned. 
 
     Args:
@@ -308,10 +314,32 @@ def update_links_to_visit(
             links_to_visit[0].discard(link)
         else:
             links_to_visit[0].add(link)
+            visited.add(link)
 
     stats.add(new_links[1])
 
-    return links_to_visit
+    return (links_to_visit, visited, stats)
+
+
+def pool(
+    links_to_visit: Tuple[Set[str], Tuple[str, timedelta, int]],
+    session: r.Session,
+    visited: Set[str],
+    stats: Set[Tuple[str, timedelta, int]],
+) -> Tuple[
+    Tuple[Set[str], Tuple[str, timedelta, int]],
+    Set[str],
+    Set[Tuple[str, timedelta, int]],
+]:
+    args = [(link, session) for link in links_to_visit[0]]
+    with get_context("spawn").Pool(maxtasksperchild=1) as p:
+        list_links_to_visit = p.starmap(process_page, args)
+
+    for item in list_links_to_visit:
+        links_to_visit, visited, stats = update_links_to_visit(
+            item, links_to_visit, visited, stats
+        )
+    return (links_to_visit, visited, stats)
 
 
 # pylint:disable=dangerous-default-value
@@ -376,6 +404,27 @@ def looper(
     return stats
 
 
+def looper_with_pool(
+    session: r.Session,
+    visited: Union[Set[Any], Set[str]] = set(),
+    links_to_visit: Union[None, Tuple[Set[str], Tuple[str, timedelta, int]]] = None,
+) -> Set[Tuple[str, timedelta, int]]:
+    links_to_visit = process_page(get_hostname(), session)
+    stats = set()
+
+    while True:
+        print(len(links_to_visit[0]))
+        print(len(visited))
+        if len(links_to_visit[0]) > 0:
+            links_to_visit, visited, stats = pool(
+                links_to_visit, session, visited, stats
+            )
+        else:
+            break
+
+    return stats
+
+
 def save_urls(visited: Set[Tuple[str, timedelta, int]]) -> None:
     """Saves found URLs stats into .csv file.
 
@@ -412,7 +461,8 @@ def main() -> None:
     start_sigint_catching()
     start_coloring()
     session = start_session()
-    visited = looper(session)
+    # visited = looper(session)
+    visited = looper_with_pool(session)
     close_session(session)
     pretty_print(visited)
     save_urls(visited)
