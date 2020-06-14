@@ -310,11 +310,10 @@ def update_links_to_visit(
         Tuple[Set[str], Tuple[str, timedelta, int]]: set of all links, which needs to be scanned;
     """
     for link in new_links[0]:
-        if link in visited:
-            links_to_visit[0].discard(link)
-        else:
+        if link not in visited:
             links_to_visit[0].add(link)
-            visited.add(link)
+        else:
+            links_to_visit[0].discard(link)
 
     stats.add(new_links[1])
 
@@ -332,13 +331,20 @@ def pool(
     Set[Tuple[str, timedelta, int]],
 ]:
     args = [(link, session) for link in links_to_visit[0]]
+
     with get_context("spawn").Pool(maxtasksperchild=1) as p:
         list_links_to_visit = p.starmap(process_page, args)
 
+    # debug
+    # printer = PrettyPrinter(indent=2)
+    # printer.pprint(list_links_to_visit)
+
     for item in list_links_to_visit:
+        visited.add(item[1][0])  # add visited url string
         links_to_visit, visited, stats = update_links_to_visit(
             item, links_to_visit, visited, stats
         )
+
     return (links_to_visit, visited, stats)
 
 
@@ -410,15 +416,19 @@ def looper_with_pool(
     links_to_visit: Union[None, Tuple[Set[str], Tuple[str, timedelta, int]]] = None,
 ) -> Set[Tuple[str, timedelta, int]]:
     links_to_visit = process_page(get_hostname(), session)
+    visited = {links_to_visit[1][0]}
     stats = set()
 
+    # debug
+    printer = PrettyPrinter(indent=2)
+
     while True:
-        print(len(links_to_visit[0]))
-        print(len(visited))
         if len(links_to_visit[0]) > 0:
             links_to_visit, visited, stats = pool(
                 links_to_visit, session, visited, stats
             )
+            # debug
+            printer.pprint((links_to_visit, visited, stats))
         else:
             break
 
