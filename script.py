@@ -202,7 +202,7 @@ def cook_soup(url: str, session: r.Session) -> Tuple[Any, Tuple[str, timedelta, 
             response = r.Response()
             response.elapsed = timedelta(seconds=0)
             response.status_code = 400
-            soup = BeautifulSoup("<html></html>", "lxml")    
+            soup = BeautifulSoup("<html></html>", "lxml")
     else:
         # return dummies
         response = r.Response()
@@ -350,6 +350,19 @@ def pool(
     Set[str],
     Set[Tuple[str, timedelta, int]],
 ]:
+    """Runs process_page() func as worker using multiprocessing module for all links.
+    Returns new links to scan, visited links and request stats for visited links.
+
+    Args:
+        links_to_visit (Tuple[Set[str], Tuple[str, timedelta, int]]): URL links to scan and request stat for URL
+        session (r.Session): session object
+        visited (Set[str]): set of visited links
+        stats (Set[Tuple[str, timedelta, int]]): set of links response stats
+
+    Returns:
+        Tuple[ Tuple[Set[str], Tuple[str, timedelta, int]], Set[str], Set[Tuple[str, timedelta, int]], ]: 
+        ((set of links to visit, url's response stats), set of visited urls, set of tuple with visited url, response time, response status code)
+    """
     args = [(link, session) for link in links_to_visit[0]]
 
     with get_context("spawn").Pool(maxtasksperchild=1) as p:
@@ -436,6 +449,17 @@ def looper_with_pool(
     visited: Union[Set[Any], Set[str]] = set(),
     links_to_visit: Union[None, Tuple[Set[str], Tuple[str, timedelta, int]]] = None,
 ) -> Set[Tuple[str, timedelta, int]]:
+    """Loops pool() funs until there is no unvisited link left.
+    Returns set with tuples of visited links, their response time and response code.
+
+    Args:
+        session (r.Session): session object
+        visited (Union[Set[Any], Set[str]], optional): set of visited links. Defaults to set().
+        links_to_visit (Union[None, Tuple[Set[str], Tuple[str, timedelta, int]]], optional): links to be scanned. Defaults to None.
+
+    Returns:
+        Set[Tuple[str, timedelta, int]]: set with tuples of visited links, their response time and response code
+    """
     links_to_visit = process_page(get_hostname(), session)
     visited = {links_to_visit[1][0]}
     stats = set()
@@ -488,7 +512,6 @@ def main() -> None:
     start_sigint_catching()
     start_coloring()
     session = start_session()
-    # visited = looper(session)
     visited = looper_with_pool(session)
     close_session(session)
     pretty_print(visited)
