@@ -343,13 +343,8 @@ def pool(
         stats.add(item[1])
         final_set = item[0].difference(final_set) | final_set
 
-    final_set = {link for link in final_set if link not in visited}
-
+    final_set = {link for link in final_set if link not in visited} or {}
     links_to_visit = (final_set, list_links_to_visit[0][1])
-    # for item in list_links_to_visit:
-    #     links_to_visit, visited, stats = update_links_to_visit(
-    #         item, links_to_visit, visited, stats
-    #     )
 
     return (links_to_visit, visited, stats)
 
