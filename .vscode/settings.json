@@ -3,5 +3,5 @@
     "python.linting.mypyEnabled": false,
     "python.linting.prospectorEnabled": true,
     "python.linting.enabled": true,
-    "python.pythonPath": "C:\\Program Files (x86)\\Python38-32\\python.exe"
+    "python.pythonPath": "/bin/python3"
 }

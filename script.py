@@ -226,7 +226,7 @@ def cook_soup(url: str, session: r.Session) -> Tuple[Any, Tuple[str, timedelta, 
         print(f"Func 'cook_soup': Exception encountered: {str(e)}")
         dummy_ = dummy(400)
 
-    sleep(0.1)
+    sleep(1)
 
     if dummy_:
         color_print(url, dummy_[0])
