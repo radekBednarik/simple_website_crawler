@@ -366,7 +366,7 @@ def looper_with_pool(
     stats = set()
 
     while True:
-        print(len(links_to_visit[0]))
+        print(f"Found new links to scan: {len(links_to_visit[0])}")
         if len(list(links_to_visit)[0]) > 0:
             links_to_visit, visited, stats = pool(
                 links_to_visit, session, visited, stats
