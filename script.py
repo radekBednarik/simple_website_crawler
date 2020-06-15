@@ -6,7 +6,7 @@ from datetime import timedelta
 from multiprocessing import get_context
 from pprint import PrettyPrinter
 from time import sleep
-from typing import Any, Set, Tuple, Union, Optional, Callable
+from typing import Any, Set, Tuple, Union, Optional
 from urllib.parse import urljoin, urlsplit
 
 import requests as r
@@ -116,6 +116,8 @@ def color_response_status(string: str) -> str:
     """
     if string.startswith("2"):
         return color_green(string)
+    if string == "418":
+        return color_yellow(string)
     if string.startswith("4"):
         return color_red(string)
     return color_yellow(string)
@@ -188,8 +190,19 @@ def cook_soup(url: str, session: r.Session) -> Tuple[Any, Tuple[str, timedelta, 
         Tuple[Any, Tuple[str, timedelta, int]] -- parsed content of the page as BeautifulSoup() object
         and response statistics of <url> visited
     """
-    response = session.get(url, timeout=(30, 60))
-    soup = BeautifulSoup(response.text, "lxml")
+    # check head first, if not file
+    headers = session.head(url).headers
+    content_type = headers.get('content-type')
+    if ("text" in content_type.lower()) or ("html" in content_type.lower()):
+        response = session.get(url, timeout=(30, 60))
+        soup = BeautifulSoup(response.text, "lxml")
+    else:
+        # return dummies
+        response = r.Response()
+        response.elapsed = timedelta(seconds=0)
+        response.status_code = 418
+        soup = BeautifulSoup("<html></html>", "lxml")
+
     print(
         "URL: '{}' :: it took: '{}' :: response status: '{}'".format(
             color_blue(url),
