@@ -10,8 +10,10 @@ from typing import Any, Optional, Set, Tuple, Union
 from urllib.parse import urljoin, urlsplit
 
 import requests as r
+
 # pyre-ignore
 from bs4 import BeautifulSoup
+
 # pyre-ignore
 from colorama import Fore, init
 
@@ -188,34 +190,49 @@ def cook_soup(url: str, session: r.Session) -> Tuple[Any, Tuple[str, timedelta, 
         Tuple[Any, Tuple[str, timedelta, int]] -- parsed content of the page as BeautifulSoup() object
         and response statistics of <url> visited
     """
-    # check head first, if not file
-    headers = session.head(url).headers
-    content_type = headers.get('content-type')
-    if ("text" in content_type.lower()) or ("html" in content_type.lower()):
-        try:
-            response = session.get(url, timeout=(60, 120))
-            soup = BeautifulSoup(response.text, "lxml")
-        except Exception as e:
-            print(f"Func 'cook_soup': Exception encountered: {str(e)}")
-            response = r.Response()
-            response.elapsed = timedelta(seconds=0)
-            response.status_code = 400
-            soup = BeautifulSoup("<html></html>", "lxml")
-    else:
-        # return dummies
+
+    def dummy(status_code: int) -> Tuple[r.Response, Any]:
         response = r.Response()
         response.elapsed = timedelta(seconds=0)
-        response.status_code = 418
+        response.status_code = 400
         soup = BeautifulSoup("<html></html>", "lxml")
+        return (response, soup)
 
-    print(
-        "URL: '{}' :: it took: '{}' :: response status: '{}'".format(
-            color_blue(url),
-            color_response_time(response.elapsed),
-            color_response_status(str(response.status_code)),
+    def color_print(url: str, response_: r.Response) -> None:
+        print(
+            "URL: '{}' :: it took: '{}' :: response status: '{}'".format(
+                color_blue(url),
+                color_response_time(response_.elapsed),
+                color_response_status(str(response_.status_code)),
+            )
         )
-    )
+
+    headers = session.head(url).headers
+    dummy_ = None
+
+    try:
+        if ("text" in headers["content-type"].lower()) or (
+            "html" in headers["content-type"].lower()
+        ):
+            try:
+                response = session.get(url, timeout=(60, 120))
+                soup = BeautifulSoup(response.text, "lxml")
+            except Exception as e:
+                print(f"Func 'cook_soup': Exception encountered: {str(e)}")
+                dummy_ = dummy(400)
+        else:
+            dummy_ = dummy(418)
+    except KeyError as e:
+        print(f"Func 'cook_soup': Exception encountered: {str(e)}")
+        dummy_ = dummy(400)
+
     sleep(0.1)
+
+    if dummy_:
+        color_print(url, dummy_[0])
+        return (dummy_[1], (url, dummy_[0].elapsed, dummy_[0].status_code))
+
+    color_print(url, response)
     return (soup, (url, response.elapsed, response.status_code))
 
 
