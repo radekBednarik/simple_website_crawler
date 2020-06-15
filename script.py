@@ -303,43 +303,6 @@ def process_page(
     return (full_links_, links[1])
 
 
-def update_links_to_visit(
-    new_links: Tuple[Set[str], Tuple[str, timedelta, int]],
-    links_to_visit: Tuple[Set[str], Tuple[str, timedelta, int]],
-    visited: Set[str],
-    stats: Set[Tuple[str, timedelta, int]],
-) -> Tuple[
-    Tuple[Set[str], Tuple[str, timedelta, int]],
-    Set[str],
-    Set[Tuple[str, timedelta, int]],
-]:
-    """Updates set of links, which needs to be scanned. 
-
-    Args:
-        new_links (Tuple[Set[str], Tuple[str, timedelta, int]]): links parsed from visited page, url response stats of page
-        which provided new links
-
-        links_to_visit (Tuple[Set[str], Tuple[str, timedelta, int]]): set of all links, which needs to be scanned;
-        url response stats of last page, which provided new links
-
-        visited (Set[str]): set of scanned links
-
-        stats (Set[Tuple[str, timedelta, int]]): set of visited links and their response stats
-
-    Returns:
-        Tuple[Set[str], Tuple[str, timedelta, int]]: set of all links, which needs to be scanned;
-    """
-    for link in new_links[0]:
-        if link not in visited:
-            links_to_visit[0].add(link)
-        else:
-            links_to_visit[0].discard(link)
-
-    stats.add(new_links[1])
-
-    return (links_to_visit, visited, stats)
-
-
 def pool(
     links_to_visit: Tuple[Set[str], Tuple[str, timedelta, int]],
     session: r.Session,
@@ -368,7 +331,7 @@ def pool(
     with get_context("spawn").Pool(maxtasksperchild=1) as p:
         list_links_to_visit = p.starmap(process_page, args)
 
-    final_set = list_links_to_visit[0][0]
+    final_set: Set[str] = list_links_to_visit[0][0]
 
     # add all visited links to set
     for item in list_links_to_visit:
@@ -376,72 +339,10 @@ def pool(
         stats.add(item[1])
         final_set = item[0].difference(final_set) | final_set
 
-    final_set = {link for link in final_set if link not in visited} or {}
+    final_set = {link for link in final_set if link not in visited}
     links_to_visit = (final_set, list_links_to_visit[0][1])
 
     return (links_to_visit, visited, stats)
-
-
-# pylint:disable=dangerous-default-value
-def looper(
-    session: r.Session,
-    visited: Union[Set[Any], Set[str]] = set(),
-    links_to_visit: Union[None, Tuple[Set[str], Tuple[str, timedelta, int]]] = None,
-) -> Set[Tuple[str, timedelta, int]]:
-    """Scans for all internal URLs, starting with provided hostname of the site.
-
-    Scan leverages infinite loop to avoid exceeding recursion limit in case of very large number
-    of links on large sites.
-
-    Arguments:
-        session {r.Session} -- requests.Session() object
-
-    Keyword Arguments:
-        visited {Union[Set[Any], Set[str]]} -- set of visited URLs, starts as empty set (default: {set()})
-
-        links_to_visit {Union[None, Tuple[Set[str], Tuple[str, timedelta, int]]]} -- set of URLs to visit
-        and tuple with response stats of last url visited.
-        Loop will continue, until this set is empty (default: {None})
-
-    Returns:
-        Set[Tuple[str, timedelta, int]] -- stats of visited URLs
-
-    Comments:
-        Refactoring candidate -- <visited> is probably redundand - get rid of visited to reduce complexity?
-        only reason it is here is to avoid more expensive scanning of set of tuples, if I used <stats> as check
-    """
-    links_to_visit = process_page(get_hostname(), session)
-    stats = set()
-
-    while True:
-        if len(links_to_visit[0]) > 0:
-            for link in list(links_to_visit[0]):
-                try:
-                    # quick hack to avoid actually sending requests to files - can lose some links due to this, maybe
-                    if "." in [link[-4], link[-5]]:
-                        links_to_visit[0].discard(link)
-                        visited.add(link)
-                        stats.add((link, timedelta(milliseconds=0.0), 0))
-                        continue
-                    if link not in visited:
-                        visited.add(link)
-                        links_to_visit = update_links_to_visit(
-                            process_page(link, session), links_to_visit, visited, stats
-                        )
-                    else:
-                        links_to_visit[0].discard(link)
-                    sleep(0.1)
-                except Exception as e:
-                    print(
-                        f"Exception encountered. Link '{link}' discarded. Possible links on this page are therefore lost. \
-                        \nException: {str(e)}"
-                    )
-                    links_to_visit[0].discard(link)
-                    visited.add(link)
-                    stats.add((link, timedelta(milliseconds=0.0), 0))
-        else:
-            break
-    return stats
 
 
 def looper_with_pool(
