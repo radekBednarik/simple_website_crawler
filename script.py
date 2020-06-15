@@ -194,8 +194,15 @@ def cook_soup(url: str, session: r.Session) -> Tuple[Any, Tuple[str, timedelta, 
     headers = session.head(url).headers
     content_type = headers.get('content-type')
     if ("text" in content_type.lower()) or ("html" in content_type.lower()):
-        response = session.get(url, timeout=(30, 60))
-        soup = BeautifulSoup(response.text, "lxml")
+        try:
+            response = session.get(url, timeout=(60, 120))
+            soup = BeautifulSoup(response.text, "lxml")
+        except Exception as e:
+            print(f"Func 'cook_soup': Exception encountered: {str(e)}")
+            response = r.Response()
+            response.elapsed = timedelta(seconds=0)
+            response.status_code = 400
+            soup = BeautifulSoup("<html></html>", "lxml")    
     else:
         # return dummies
         response = r.Response()
