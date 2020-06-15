@@ -194,7 +194,7 @@ def cook_soup(url: str, session: r.Session) -> Tuple[Any, Tuple[str, timedelta, 
     def dummy(status_code: int) -> Tuple[r.Response, Any]:
         response = r.Response()
         response.elapsed = timedelta(seconds=0)
-        response.status_code = 400
+        response.status_code = status_code
         soup = BeautifulSoup("<html></html>", "lxml")
         return (response, soup)
 
@@ -209,6 +209,8 @@ def cook_soup(url: str, session: r.Session) -> Tuple[Any, Tuple[str, timedelta, 
 
     headers = session.head(url).headers
     dummy_ = None
+    response = r.Response()
+    soup = BeautifulSoup("", "lxml")
 
     try:
         if ("text" in headers["content-type"].lower()) or (
@@ -290,6 +292,7 @@ def create_full_link(hostname: str, internal_link: str) -> Optional[str]:
         for part in parts[1:-1]:
             if part in internal_link_split.netloc:
                 return urljoin(hostname, internal_link)
+        # pylint: disable=useless-else-on-loop
         else:
             return None
 
@@ -360,6 +363,7 @@ def pool(
     return (links_to_visit, visited, stats)
 
 
+# pylint: disable=dangerous-default-value
 def looper_with_pool(
     session: r.Session,
     visited: Union[Set[Any], Set[str]] = set(),
