@@ -3,16 +3,15 @@ import signal
 import sys
 from datetime import datetime as dt
 from datetime import timedelta
+from multiprocessing import get_context
 from pprint import PrettyPrinter
 from time import sleep
-from typing import Any, Set, Tuple, Union, Optional
+from typing import Any, Optional, Set, Tuple, Union
 from urllib.parse import urljoin, urlsplit
 
 import requests as r
-
 # pyre-ignore
 from bs4 import BeautifulSoup
-
 # pyre-ignore
 from colorama import Fore, init
 
@@ -115,6 +114,8 @@ def color_response_status(string: str) -> str:
     """
     if string.startswith("2"):
         return color_green(string)
+    if string == "418":
+        return color_yellow(string)
     if string.startswith("4"):
         return color_red(string)
     return color_yellow(string)
@@ -187,8 +188,26 @@ def cook_soup(url: str, session: r.Session) -> Tuple[Any, Tuple[str, timedelta, 
         Tuple[Any, Tuple[str, timedelta, int]] -- parsed content of the page as BeautifulSoup() object
         and response statistics of <url> visited
     """
-    response = session.get(url, timeout=(30, 60))
-    soup = BeautifulSoup(response.text, "lxml")
+    # check head first, if not file
+    headers = session.head(url).headers
+    content_type = headers.get('content-type')
+    if ("text" in content_type.lower()) or ("html" in content_type.lower()):
+        try:
+            response = session.get(url, timeout=(60, 120))
+            soup = BeautifulSoup(response.text, "lxml")
+        except Exception as e:
+            print(f"Func 'cook_soup': Exception encountered: {str(e)}")
+            response = r.Response()
+            response.elapsed = timedelta(seconds=0)
+            response.status_code = 400
+            soup = BeautifulSoup("<html></html>", "lxml")
+    else:
+        # return dummies
+        response = r.Response()
+        response.elapsed = timedelta(seconds=0)
+        response.status_code = 418
+        soup = BeautifulSoup("<html></html>", "lxml")
+
     print(
         "URL: '{}' :: it took: '{}' :: response status: '{}'".format(
             color_blue(url),
@@ -196,6 +215,7 @@ def cook_soup(url: str, session: r.Session) -> Tuple[Any, Tuple[str, timedelta, 
             color_response_status(str(response.status_code)),
         )
     )
+    sleep(0.1)
     return (soup, (url, response.elapsed, response.status_code))
 
 
@@ -281,98 +301,77 @@ def process_page(
     return (full_links_, links[1])
 
 
-def update_links_to_visit(
-    new_links: Tuple[Set[str], Tuple[str, timedelta, int]],
+def pool(
     links_to_visit: Tuple[Set[str], Tuple[str, timedelta, int]],
+    session: r.Session,
     visited: Set[str],
     stats: Set[Tuple[str, timedelta, int]],
-) -> Tuple[Set[str], Tuple[str, timedelta, int]]:
-    """Updates set of links, which needs to be scanned. 
+) -> Tuple[
+    Tuple[Set[str], Tuple[str, timedelta, int]],
+    Set[str],
+    Set[Tuple[str, timedelta, int]],
+]:
+    """Runs process_page() func as worker using multiprocessing module for all links.
+    Returns new links to scan, visited links and request stats for visited links.
 
     Args:
-        new_links (Tuple[Set[str], Tuple[str, timedelta, int]]): links parsed from visited page, url response stats of page
-        which provided new links
-
-        links_to_visit (Tuple[Set[str], Tuple[str, timedelta, int]]): set of all links, which needs to be scanned;
-        url response stats of last page, which provided new links
-
-        visited (Set[str]): set of scanned links
-
-        stats (Set[Tuple[str, timedelta, int]]): set of visited links and their response stats
+        links_to_visit (Tuple[Set[str], Tuple[str, timedelta, int]]): URL links to scan and request stat for URL
+        session (r.Session): session object
+        visited (Set[str]): set of visited links
+        stats (Set[Tuple[str, timedelta, int]]): set of links response stats
 
     Returns:
-        Tuple[Set[str], Tuple[str, timedelta, int]]: set of all links, which needs to be scanned;
+        Tuple[ Tuple[Set[str], Tuple[str, timedelta, int]], Set[str], Set[Tuple[str, timedelta, int]], ]: 
+        ((set of links to visit, url's response stats), set of visited urls, set of tuple with visited url, response time, response status code)
     """
-    for link in new_links[0]:
-        if link in visited:
-            links_to_visit[0].discard(link)
-        else:
-            links_to_visit[0].add(link)
+    args = [(link, session) for link in links_to_visit[0]]
 
-    stats.add(new_links[1])
+    with get_context("spawn").Pool(maxtasksperchild=1) as p:
+        list_links_to_visit = p.starmap(process_page, args)
 
-    return links_to_visit
+    final_set: Set[str] = list_links_to_visit[0][0]
+
+    # add all visited links to set
+    for item in list_links_to_visit:
+        visited.add(item[1][0])
+        stats.add(item[1])
+        final_set = item[0].difference(final_set) | final_set
+
+    final_set = {link for link in final_set if link not in visited}
+    links_to_visit = (final_set, list_links_to_visit[0][1])
+
+    return (links_to_visit, visited, stats)
 
 
-# pylint:disable=dangerous-default-value
-def looper(
+def looper_with_pool(
     session: r.Session,
     visited: Union[Set[Any], Set[str]] = set(),
     links_to_visit: Union[None, Tuple[Set[str], Tuple[str, timedelta, int]]] = None,
 ) -> Set[Tuple[str, timedelta, int]]:
-    """Scans for all internal URLs, starting with provided hostname of the site.
+    """Loops pool() funs until there is no unvisited link left.
+    Returns set with tuples of visited links, their response time and response code.
 
-    Scan leverages infinite loop to avoid exceeding recursion limit in case of very large number
-    of links on large sites.
-
-    Arguments:
-        session {r.Session} -- requests.Session() object
-
-    Keyword Arguments:
-        visited {Union[Set[Any], Set[str]]} -- set of visited URLs, starts as empty set (default: {set()})
-
-        links_to_visit {Union[None, Tuple[Set[str], Tuple[str, timedelta, int]]]} -- set of URLs to visit
-        and tuple with response stats of last url visited.
-        Loop will continue, until this set is empty (default: {None})
+    Args:
+        session (r.Session): session object
+        visited (Union[Set[Any], Set[str]], optional): set of visited links. Defaults to set().
+        links_to_visit (Union[None, Tuple[Set[str], Tuple[str, timedelta, int]]], optional): links to be scanned. Defaults to None.
 
     Returns:
-        Set[Tuple[str, timedelta, int]] -- stats of visited URLs
-
-    Comments:
-        Refactoring candidate -- <visited> is probably redundand - get rid of visited to reduce complexity?
-        only reason it is here is to avoid more expensive scanning of set of tuples, if I used <stats> as check
+        Set[Tuple[str, timedelta, int]]: set with tuples of visited links, their response time and response code
     """
     links_to_visit = process_page(get_hostname(), session)
+    visited = {links_to_visit[1][0]}
     stats = set()
 
     while True:
-        if len(links_to_visit[0]) > 0:
-            for link in list(links_to_visit[0]):
-                try:
-                    # quick hack to avoid actually sending requests to files - can lose some links due to this, maybe
-                    if "." in [link[-4], link[-5]]:
-                        links_to_visit[0].discard(link)
-                        visited.add(link)
-                        stats.add((link, timedelta(milliseconds=0.0), 0))
-                        continue
-                    if link not in visited:
-                        visited.add(link)
-                        links_to_visit = update_links_to_visit(
-                            process_page(link, session), links_to_visit, visited, stats
-                        )
-                    else:
-                        links_to_visit[0].discard(link)
-                    sleep(0.1)
-                except Exception as e:
-                    print(
-                        f"Exception encountered. Link '{link}' discarded. Possible links on this page are therefore lost. \
-                        \nException: {str(e)}"
-                    )
-                    links_to_visit[0].discard(link)
-                    visited.add(link)
-                    stats.add((link, timedelta(milliseconds=0.0), 0))
+        print(f"Found new links to scan: {len(links_to_visit[0])}")
+        if len(list(links_to_visit)[0]) > 0:
+            links_to_visit, visited, stats = pool(
+                links_to_visit, session, visited, stats
+            )
         else:
             break
+
     return stats
 
 
@@ -412,7 +411,7 @@ def main() -> None:
     start_sigint_catching()
     start_coloring()
     session = start_session()
-    visited = looper(session)
+    visited = looper_with_pool(session)
     close_session(session)
     pretty_print(visited)
     save_urls(visited)
