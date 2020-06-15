@@ -6,14 +6,12 @@ from datetime import timedelta
 from multiprocessing import get_context
 from pprint import PrettyPrinter
 from time import sleep
-from typing import Any, Set, Tuple, Union, Optional
+from typing import Any, Optional, Set, Tuple, Union
 from urllib.parse import urljoin, urlsplit
 
 import requests as r
-
 # pyre-ignore
 from bs4 import BeautifulSoup
-
 # pyre-ignore
 from colorama import Fore, init
 
