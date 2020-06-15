@@ -335,14 +335,21 @@ def pool(
     with get_context("spawn").Pool(maxtasksperchild=1) as p:
         list_links_to_visit = p.starmap(process_page, args)
 
+    final_set = list_links_to_visit[0][0]
+
     # add all visited links to set
     for item in list_links_to_visit:
         visited.add(item[1][0])
+        stats.add(item[1])
+        final_set = item[0].difference(final_set) | final_set
 
-    for item in list_links_to_visit:
-        links_to_visit, visited, stats = update_links_to_visit(
-            item, links_to_visit, visited, stats
-        )
+    final_set = {link for link in final_set if link not in visited}
+
+    links_to_visit = (final_set, list_links_to_visit[0][1])
+    # for item in list_links_to_visit:
+    #     links_to_visit, visited, stats = update_links_to_visit(
+    #         item, links_to_visit, visited, stats
+    #     )
 
     return (links_to_visit, visited, stats)
 
@@ -418,17 +425,12 @@ def looper_with_pool(
     visited = {links_to_visit[1][0]}
     stats = set()
 
-    # debug
-    printer = PrettyPrinter(indent=2)
-
     while True:
         print(len(links_to_visit[0]))
         if len(list(links_to_visit)[0]) > 0:
             links_to_visit, visited, stats = pool(
                 links_to_visit, session, visited, stats
             )
-            # debug
-            # printer.pprint((links_to_visit, visited, stats))
         else:
             break
 
